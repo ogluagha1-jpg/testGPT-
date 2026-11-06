@@ -7,7 +7,10 @@ An Expo / React Native Xtream player for iPhone and Android. Connect with your p
 - Cinema-style Discover screen with selectable featured titles and horizontal movie shelves
 - Responsive poster grids, live channel cards, category filters, search, and A–Z sorting
 - Xtream authentication and channel/movie catalogs
-- Native video playback with fullscreen controls (HLS for live channels)
+- Cinema welcome screen with poster artwork and a keyboard-aware connection form
+- Styled player with play/pause, movie seeking, mute, speed, picture fit, fullscreen, favorites, and quick title/channel switching
+- Native fullscreen controls and HLS playback for live channels
+- Demo player preview with playback controls clearly disabled until a server is connected
 - Favorites saved on the device, separated by server and account
 - Optional login storage using iOS Keychain / Android encrypted storage; sign-out deletes the saved login
 - Demo catalog with bundled original poster artwork (demo titles do not stream)
@@ -48,4 +51,4 @@ There is no content service or backend bundled with this app. Series, EPG, catch
 
 ## Validation scope
 
-Automated tests cover URL handling, catalog parsing, authentication, errors, and cancellation with mocked server responses. A successful export verifies bundling, not native playback. Validate login, live playback, movie seeking, fullscreen, secure persistence, and sign-out on physical iPhone and Android devices with your provider before distribution. Do not put real credentials in this repository or send them in chat.
+Automated tests cover URL handling, catalog parsing, authentication, errors, and cancellation with mocked server responses. Browser tests also exercise a generated 30-second MP4 fixture to verify play/pause, seeking, mute, and speed, plus error/retry handling. A successful export verifies bundling, not native playback. Validate login, live playback, movie seeking, fullscreen, secure persistence, and sign-out on physical iPhone and Android devices with your provider before distribution. Do not put real credentials in this repository or send them in chat.

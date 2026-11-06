@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 
 test("demo supports category filters, search, favorites, movies, and sign out", async ({
@@ -176,4 +177,192 @@ test("cinema discovery has selectable features, responsive posters, and working 
     fullPage: true,
   });
   expect(errors).toEqual([]);
+});
+
+test("cinema login and demo player have responsive layouts and working favorites", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  await expect(page.getByText("Your cinema.", { exact: false })).toBeVisible();
+  await page.getByLabel("Password", { exact: true }).fill("sample");
+  await page.getByLabel("Show password").click();
+  await expect(page.getByLabel("Password", { exact: true })).toHaveJSProperty(
+    "type",
+    "text",
+  );
+  await page.getByLabel("Hide password").click();
+  await expect(page.getByLabel("Password", { exact: true })).toHaveAttribute(
+    "type",
+    "password",
+  );
+  await page.screenshot({
+    path: "test-results/currentline-login.png",
+    fullPage: true,
+  });
+  await page.getByText("with demo mode →").click();
+  await page
+    .getByRole("button", { name: "Play featured Beyond the Horizon" })
+    .click();
+  await expect(page.getByText("PLAYER PREVIEW", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Play playback" }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Save playing title to favorites" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Remove playing title from favorites" }),
+  ).toBeVisible();
+  await page.getByText("Your next great watch.").scrollIntoViewIfNeeded();
+  await expect(page.getByText("Your next great watch.")).toBeInViewport();
+  await page.screenshot({
+    path: "test-results/currentline-player.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Switch to The Quiet City" }).click();
+  await expect(
+    page.getByText("The Quiet City", { exact: true }).last(),
+  ).toBeVisible();
+  for (const viewport of [
+    { width: 320, height: 800 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await expect(
+      page.getByRole("button", { name: "Close player" }),
+    ).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Close player" }).click();
+  await page.getByRole("tab", { name: "Favorites", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Play Beyond the Horizon", exact: true }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("movie player controls real browser video and handles failed live streams", async ({
+  page,
+}) => {
+  await page.route(
+    "https://provider.example/player_api.php*",
+    async (route) => {
+      const action = new URL(route.request().url()).searchParams.get("action");
+      await route.fulfill({
+        json: !action
+          ? { user_info: { auth: 1, status: "Active" } }
+          : action.includes("categories")
+            ? []
+            : [
+                {
+                  stream_id: 17,
+                  name:
+                    action === "get_live_streams" ? "Test live" : "Test movie",
+                  container_extension: "mp4",
+                },
+              ],
+      });
+    },
+  );
+  const videoBytes = readFileSync("e2e/fixtures/playback.mp4");
+  await page.route("https://provider.example/movie/**", (route) => {
+    const range = route.request().headers()["range"];
+    const match = range?.match(/bytes=(\d+)-(\d*)/);
+    if (match) {
+      const start = Number(match[1]);
+      const end = Math.min(
+        match[2] ? Number(match[2]) : videoBytes.length - 1,
+        videoBytes.length - 1,
+      );
+      return route.fulfill({
+        status: 206,
+        body: videoBytes.subarray(start, end + 1),
+        contentType: "video/mp4",
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Content-Range": `bytes ${start}-${end}/${videoBytes.length}`,
+        },
+      });
+    }
+    return route.fulfill({
+      body: videoBytes,
+      contentType: "video/mp4",
+      headers: { "Accept-Ranges": "bytes" },
+    });
+  });
+  let failedRequests = 0;
+  await page.route("https://provider.example/live/**", (route) => {
+    failedRequests++;
+    return route.fulfill({ status: 503, body: "Unavailable" });
+  });
+  await page.goto("/");
+  await page.getByLabel("Server address").fill("https://provider.example");
+  await page.getByLabel("Username", { exact: true }).fill("demo-user");
+  await page.getByLabel("Password", { exact: true }).fill("test-password");
+  await page.getByRole("button", { name: "Connect & explore" }).click();
+  await page.getByRole("button", { name: "Play featured Test movie" }).click();
+  const video = page.locator("video");
+  await expect(video).toBeVisible();
+  expect((await video.boundingBox())!.height).toBeGreaterThan(150);
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+  if (
+    await page
+      .getByRole("button", { name: "Play playback", exact: true })
+      .count()
+  )
+    await page
+      .getByRole("button", { name: "Play playback", exact: true })
+      .click();
+  await page.getByRole("button", { name: "Pause playback" }).click();
+  await expect
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.paused))
+    .toBe(true);
+  await page.getByRole("button", { name: "Forward 10 seconds" }).click();
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.currentTime),
+    )
+    .toBeGreaterThanOrEqual(10);
+  await page.getByRole("button", { name: "Back 10 seconds" }).click();
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.currentTime),
+    )
+    .toBeLessThan(5);
+  await page.getByRole("button", { name: "Mute", exact: true }).click();
+  await expect
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.muted))
+    .toBe(true);
+  await page.getByRole("button", { name: "Change playback speed" }).click();
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.playbackRate),
+    )
+    .toBe(1.25);
+  await page.getByRole("button", { name: "Change picture fit" }).click();
+  await expect(page.getByText("Fill screen ↔")).toBeVisible();
+  await page.getByRole("button", { name: "Close player" }).click();
+  await expect(video).toHaveCount(0);
+  await page.getByRole("tab", { name: "Live TV", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Play Test live", exact: true })
+    .click();
+  await expect(page.getByText("A pause in the story.")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Forward 10 seconds" }),
+  ).toHaveCount(0);
+  const beforeRetry = failedRequests;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect.poll(() => failedRequests).toBeGreaterThan(beforeRetry);
+  await page.getByRole("button", { name: "Close player" }).click();
 });
