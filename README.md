@@ -4,11 +4,14 @@ An Expo / React Native Xtream player for iPhone and Android. Connect with your p
 
 ## Features
 
-- Xtream authentication, channel and movie catalogs, categories, and search
+- Cinema-style Discover screen with selectable featured titles and horizontal movie shelves
+- Responsive poster grids, live channel cards, category filters, search, and A–Z sorting
+- Xtream authentication and channel/movie catalogs
 - Native video playback with fullscreen controls (HLS for live channels)
 - Favorites saved on the device, separated by server and account
 - Optional login storage using iOS Keychain / Android encrypted storage; sign-out deletes the saved login
-- Demo catalog for exploring the interface without credentials (demo titles do not stream)
+- Demo catalog with bundled original poster artwork (demo titles do not stream)
+- Provider artwork when available, with a styled fallback for missing or failed images
 - Loading, empty, cancellation, connection-error, and playback-error states
 
 ## Develop

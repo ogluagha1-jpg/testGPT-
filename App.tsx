@@ -2,8 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -23,13 +21,13 @@ import { useEvent } from "expo";
 import {
   Catalog,
   Credentials,
-  Kind,
   Stream,
   loadCatalog,
   normalizeServer,
   playbackUrl,
 } from "./src/xtream";
 import { demoCatalog } from "./src/demo";
+import Library from "./src/Library";
 
 const EMPTY: Credentials = { server: "", username: "", password: "" };
 const SECRET_KEY = "currentline.connection";
@@ -122,9 +120,6 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<Kind | "favorites">("live");
-  const [category, setCategory] = useState("");
-  const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [playing, setPlaying] = useState<Stream | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -249,9 +244,6 @@ export default function App() {
     setForm(EMPTY);
     setDemo(false);
     setFavorites([]);
-    setQuery("");
-    setCategory("");
-    setTab("live");
     setError("");
     favoriteStorage.current = "";
   }
@@ -279,23 +271,6 @@ export default function App() {
     }
     setPlaying(stream);
   }
-
-  const categories =
-    !catalog || tab === "favorites"
-      ? []
-      : tab === "live"
-        ? catalog.liveCategories
-        : catalog.movieCategories;
-  const all = catalog ? [...catalog.live, ...catalog.movie] : [];
-  const items = (
-    tab === "favorites"
-      ? all.filter((item) => favorites.includes(streamKey(item)))
-      : (catalog?.[tab] ?? [])
-  ).filter(
-    (item) =>
-      (!category || item.category === category) &&
-      item.name.toLowerCase().includes(query.toLowerCase().trim()),
-  );
 
   return (
     <SafeAreaProvider>
@@ -444,236 +419,15 @@ export default function App() {
             </Text>
           </ScrollView>
         ) : (
-          <View style={s.flex}>
-            <View style={s.topbar}>
-              <View style={s.brandRow}>
-                <View style={s.smallLogo}>
-                  <Text style={s.logoText}>▶</Text>
-                </View>
-                <Text style={s.brand}>
-                  currentline<Text style={s.brandDot}>.</Text>
-                </Text>
-              </View>
-              <Pressable
-                accessibilityLabel="Disconnect and remove saved login"
-                onPress={() => void disconnect()}
-                style={s.disconnect}
-              >
-                <Text style={s.disconnectText}>
-                  {demo ? "Exit demo" : "Sign out"}
-                </Text>
-              </Pressable>
-            </View>
-            <View style={s.libraryHeader}>
-              <Text style={s.eyebrow}>
-                {demo ? "DEMO COLLECTION" : "YOUR PERSONAL COLLECTION"}
-              </Text>
-              <Text style={s.libraryTitle}>
-                {tab === "live"
-                  ? "On air. Right now."
-                  : tab === "movie"
-                    ? "Make it a movie night."
-                    : "Your front row."}
-              </Text>
-              <Text style={s.muted}>
-                {tab === "live"
-                  ? "Find something worth tuning into."
-                  : tab === "movie"
-                    ? "Settle in. Your next story is waiting."
-                    : "The channels and movies you love."}
-              </Text>
-              <View style={s.searchRow}>
-                <Text style={s.searchIcon}>⌕</Text>
-                <TextInput
-                  accessibilityLabel="Search titles"
-                  style={s.search}
-                  placeholder="Search your collection"
-                  placeholderTextColor={C.dim}
-                  value={query}
-                  onChangeText={setQuery}
-                  autoCorrect={false}
-                />
-                <Pressable
-                  accessibilityLabel="Clear search"
-                  onPress={() => setQuery("")}
-                  style={s.clearSearch}
-                >
-                  <Text style={s.muted}>{query ? "×" : ""}</Text>
-                </Pressable>
-              </View>
-            </View>
-            {!!error && (
-              <Text accessibilityRole="alert" style={[s.error, s.libraryError]}>
-                {error}
-              </Text>
-            )}
-            {categories.length > 0 && (
-              <View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={s.chips}
-                >
-                  {[{ id: "", name: "All categories" }, ...categories].map(
-                    (item) => (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: category === item.id }}
-                        key={item.id}
-                        onPress={() => setCategory(item.id)}
-                        style={[s.chip, category === item.id && s.chipActive]}
-                      >
-                        <Text
-                          style={[
-                            s.chipText,
-                            category === item.id && s.chipTextActive,
-                          ]}
-                        >
-                          {item.name}
-                        </Text>
-                      </Pressable>
-                    ),
-                  )}
-                </ScrollView>
-              </View>
-            )}
-            <View style={s.sectionHeading}>
-              <Text style={s.sectionTitle}>
-                {tab === "favorites"
-                  ? "SAVED FOR YOU"
-                  : tab === "live"
-                    ? "CHANNEL GUIDE"
-                    : "MOVIE LIBRARY"}
-              </Text>
-              <Text style={s.muted}>{items.length} titles</Text>
-            </View>
-            <FlatList
-              data={items}
-              keyExtractor={streamKey}
-              contentContainerStyle={s.list}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item, index }) => (
-                <View style={s.streamCard}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Play ${item.name}`}
-                    onPress={() => play(item)}
-                    style={s.streamMain}
-                  >
-                    <View
-                      style={[
-                        s.artwork,
-                        {
-                          backgroundColor: [
-                            "#173c40",
-                            "#34304c",
-                            "#423525",
-                            "#253c53",
-                          ][index % 4],
-                        },
-                      ]}
-                    >
-                      <Text style={s.artworkLetter}>
-                        {item.name.slice(0, 1).toUpperCase()}
-                      </Text>
-                      {item.image && (
-                        <Image
-                          source={{ uri: item.image }}
-                          style={s.artworkImage}
-                          resizeMode="cover"
-                        />
-                      )}
-                    </View>
-                    <View style={s.streamInfo}>
-                      <Text style={s.streamName} numberOfLines={2}>
-                        {item.name}
-                      </Text>
-                      <Text style={s.streamMeta}>
-                        {item.kind === "live"
-                          ? "● LIVE"
-                          : item.extension.toUpperCase()}
-                        <Text style={s.dim}>
-                          {" "}
-                          ·{" "}
-                          {demo
-                            ? "Demo title"
-                            : ((item.kind === "live"
-                                ? catalog.liveCategories
-                                : catalog.movieCategories
-                              ).find((c) => c.id === item.category)?.name ??
-                              "Uncategorized")}
-                        </Text>
-                      </Text>
-                    </View>
-                    <View style={s.playCircle}>
-                      <Text style={s.playIcon}>▶</Text>
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${favorites.includes(streamKey(item)) ? "Remove" : "Add"} ${item.name} ${favorites.includes(streamKey(item)) ? "from" : "to"} favorites`}
-                    onPress={() => toggleFavorite(item)}
-                    style={s.favorite}
-                  >
-                    <Text
-                      style={[
-                        s.heart,
-                        favorites.includes(streamKey(item)) && s.saved,
-                      ]}
-                    >
-                      {favorites.includes(streamKey(item)) ? "♥" : "♡"}
-                    </Text>
-                  </Pressable>
-                </View>
-              )}
-              ListEmptyComponent={
-                <View style={s.empty}>
-                  <Text style={s.emptyIcon}>
-                    {tab === "favorites" ? "♡" : "⌕"}
-                  </Text>
-                  <Text style={s.title}>
-                    {tab === "favorites" && !query
-                      ? "Keep the good ones close."
-                      : "No titles found."}
-                  </Text>
-                  <Text style={s.emptyText}>
-                    {tab === "favorites" && !query
-                      ? "Tap the heart beside any channel or movie to save it here."
-                      : "Try another search or category. Your provider may not have added titles yet."}
-                  </Text>
-                </View>
-              }
-            />
-            <View style={s.tabs}>
-              {(
-                [
-                  { id: "live", icon: "▣", title: "Live TV" },
-                  { id: "movie", icon: "▷", title: "Movies" },
-                  { id: "favorites", icon: "♡", title: "Favorites" },
-                ] as const
-              ).map((item) => (
-                <Pressable
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: tab === item.id }}
-                  key={item.id}
-                  onPress={() => {
-                    setTab(item.id);
-                    setCategory("");
-                    setQuery("");
-                  }}
-                  style={s.tab}
-                >
-                  <Text style={[s.tabIcon, tab === item.id && s.active]}>
-                    {item.icon}
-                  </Text>
-                  <Text style={[s.tabText, tab === item.id && s.active]}>
-                    {item.title}
-                  </Text>
-                  {tab === item.id && <View style={s.tabDot} />}
-                </Pressable>
-              ))}
-            </View>
-          </View>
+          <Library
+            catalog={catalog}
+            demo={demo}
+            favorites={favorites}
+            error={error}
+            onPlay={play}
+            onFavorite={toggleFavorite}
+            onDisconnect={() => void disconnect()}
+          />
         )}
         <Modal
           visible={!!playing}
@@ -720,14 +474,6 @@ const s = StyleSheet.create({
     height: 38,
     backgroundColor: C.accent,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  smallLogo: {
-    width: 30,
-    height: 30,
-    backgroundColor: C.accent,
-    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -822,150 +568,6 @@ const s = StyleSheet.create({
   demoButton: { paddingVertical: 22, alignItems: "center" },
   demoText: { color: C.muted, fontSize: 12 },
   footnote: { color: C.dim, fontSize: 11, textAlign: "center", lineHeight: 18 },
-  topbar: {
-    paddingHorizontal: 22,
-    paddingVertical: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderColor: C.border,
-  },
-  disconnect: { padding: 10 },
-  disconnectText: { color: C.muted, fontSize: 11 },
-  libraryHeader: { padding: 22, paddingBottom: 10 },
-  libraryTitle: {
-    fontSize: 28,
-    letterSpacing: -0.8,
-    fontWeight: "800",
-    color: C.text,
-    marginBottom: 8,
-  },
-  searchRow: {
-    flexDirection: "row",
-    borderRadius: 12,
-    alignItems: "center",
-    backgroundColor: C.panel,
-    borderWidth: 1,
-    borderColor: C.border,
-    marginTop: 22,
-  },
-  searchIcon: { fontSize: 29, color: C.dim, paddingLeft: 14 },
-  search: { flex: 1, color: C.text, fontSize: 13, padding: 14 },
-  clearSearch: { padding: 14 },
-  chips: { paddingHorizontal: 22, gap: 8, paddingTop: 6, paddingBottom: 10 },
-  chip: {
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-  },
-  chipActive: { backgroundColor: C.accent, borderColor: C.accent },
-  chipText: { fontSize: 11, color: C.muted, fontWeight: "600" },
-  chipTextActive: { color: C.bg },
-  sectionHeading: {
-    paddingHorizontal: 22,
-    paddingVertical: 15,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    fontSize: 10,
-    letterSpacing: 1.6,
-    color: C.muted,
-    fontWeight: "700",
-  },
-  list: { paddingHorizontal: 22, paddingBottom: 20, flexGrow: 1 },
-  streamCard: {
-    flexDirection: "row",
-    backgroundColor: C.panel,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 15,
-    marginBottom: 10,
-    alignItems: "center",
-  },
-  streamMain: {
-    flex: 1,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 13,
-  },
-  artwork: {
-    width: 56,
-    height: 65,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  artworkLetter: { color: "#ffffffa0", fontSize: 30, fontWeight: "300" },
-  artworkImage: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  streamInfo: { flex: 1, gap: 7 },
-  streamName: {
-    color: C.text,
-    fontWeight: "600",
-    fontSize: 14,
-    lineHeight: 19,
-  },
-  streamMeta: { fontSize: 9, color: C.accent, fontWeight: "700" },
-  dim: { color: C.dim, fontWeight: "400" },
-  playCircle: {
-    width: 29,
-    height: 29,
-    borderRadius: 15,
-    backgroundColor: "#223830",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playIcon: { color: C.accent, fontSize: 10 },
-  favorite: {
-    minWidth: 44,
-    minHeight: 60,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingRight: 6,
-  },
-  heart: { color: C.dim, fontSize: 26 },
-  saved: { color: C.accent },
-  tabs: {
-    flexDirection: "row",
-    paddingTop: 12,
-    paddingBottom: 8,
-    borderTopWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.bg,
-  },
-  tab: { flex: 1, alignItems: "center", gap: 4, paddingBottom: 10 },
-  tabIcon: { color: C.dim, fontSize: 25 },
-  tabText: { color: C.dim, fontSize: 10, fontWeight: "600" },
-  active: { color: C.accent },
-  tabDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.accent,
-    position: "absolute",
-    bottom: 0,
-  },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 25,
-    gap: 15,
-  },
-  emptyIcon: { fontSize: 48, color: C.accent },
-  emptyText: {
-    color: C.muted,
-    textAlign: "center",
-    lineHeight: 22,
-    fontSize: 13,
-  },
-  libraryError: { marginHorizontal: 22 },
   playerScreen: { flex: 1, backgroundColor: C.bg },
   playerHeader: {
     flexDirection: "row",
