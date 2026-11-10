@@ -151,7 +151,7 @@ export default function Library({
       <View style={[s.posterCard, { width: size }]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Play ${item.name}`}
+          accessibilityLabel={`${item.kind === "movie" ? "Details for" : "Play"} ${item.name}`}
           onPress={() => onPlay(item)}
           style={s.poster}
         >
@@ -168,7 +168,7 @@ export default function Library({
           </View>
         </Pressable>
         {favoriteButton(item, true)}
-        <Text style={s.posterTitle} numberOfLines={1}>
+        <Text style={s.posterTitle} numberOfLines={2}>
           {item.name}
         </Text>
         <Text style={s.meta} numberOfLines={1}>
@@ -326,13 +326,17 @@ export default function Library({
                     <View style={s.heroActions}>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Play featured ${featured.name}`}
+                        accessibilityLabel={`${featured.kind === "movie" ? "Details for featured" : "Play featured"} ${featured.name}`}
                         onPress={() => onPlay(featured)}
                         style={s.playButton}
                       >
                         <View style={[s.triangle, s.darkTriangle]} />
                         <Text style={s.playButtonText}>
-                          {demo ? "Explore demo" : "Watch now"}
+                          {featured.kind === "movie"
+                            ? "View details"
+                            : demo
+                              ? "Explore demo"
+                              : "Watch now"}
                         </Text>
                       </Pressable>
                       <Pressable
@@ -437,7 +441,7 @@ export default function Library({
                       {catalog.live.slice(0, 8).map((item) => (
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel={`Play ${item.name}`}
+                          accessibilityLabel={`${item.kind === "movie" ? "Details for" : "Play"} ${item.name}`}
                           key={key(item)}
                           onPress={() => onPlay(item)}
                           style={s.channelTile}
@@ -523,7 +527,7 @@ export default function Library({
             <View style={s.channelRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Play ${item.name}`}
+                accessibilityLabel={`${item.kind === "movie" ? "Details for" : "Play"} ${item.name}`}
                 onPress={() => onPlay(item)}
                 style={s.channelMain}
               >
@@ -912,6 +916,8 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     marginTop: 10,
+    minHeight: 32,
+    lineHeight: 16,
   },
   meta: { color: "#8a9aa7", fontSize: 10, marginTop: 5, lineHeight: 15 },
   favorite: {

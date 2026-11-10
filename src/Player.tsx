@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -24,12 +24,6 @@ type Props = {
   onSelect: (stream: Stream) => void;
   close: () => void;
 };
-export function formatTime(value: number) {
-  if (!Number.isFinite(value) || value < 0) return "0:00";
-  const seconds = Math.floor(value);
-  const hours = Math.floor(seconds / 3600);
-  return `${hours ? `${hours}:` : ""}${hours ? String(Math.floor(seconds / 60) % 60).padStart(2, "0") : Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
 const demoArt: Record<string, number> = {
   "11": require("../assets/demo/horizon.jpg"),
   "12": require("../assets/demo/city.jpg"),
@@ -56,52 +50,25 @@ export default function Player({
         }
       : null;
   const player = useVideoPlayer(source, (instance) => {
-    instance.timeUpdateEventInterval = 0.5;
     if (source) instance.play();
   });
-  const videoRef = useRef<VideoView>(null);
   const { status } = useEvent(player, "statusChange", {
     status: player.status,
   });
   const { isPlaying } = useEvent(player, "playingChange", {
     isPlaying: player.playing,
   });
-  const { muted } = useEvent(player, "mutedChange", { muted: player.muted });
-  const { playbackRate } = useEvent(player, "playbackRateChange", {
-    playbackRate: player.playbackRate,
-  });
-  const { currentTime } = useEvent(player, "timeUpdate", {
-    currentTime: player.currentTime,
-    currentLiveTimestamp: null,
-    currentOffsetFromLive: null,
-    bufferedPosition: 0,
-  });
-  const [fit, setFit] = useState<"contain" | "cover">("contain");
   const [controlError, setControlError] = useState("");
-  const [seekWidth, setSeekWidth] = useState(1);
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
   const live = stream.kind === "live";
   const ready = !demo && status === "readyToPlay";
-  const duration = Number.isFinite(player.duration)
-    ? Math.max(0, player.duration)
-    : 0;
-  const progress =
-    duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
   const category = (
     live ? catalog.liveCategories : catalog.movieCategories
   ).find((item) => item.id === stream.category)?.name;
   const otherTitles = catalog[stream.kind]
     .filter((item) => item.id !== stream.id)
     .slice(0, 12);
-  function control(action: () => void) {
-    setControlError("");
-    try {
-      action();
-    } catch {
-      setControlError("This control is not available for the current stream.");
-    }
-  }
   async function retry() {
     setControlError("");
     try {
@@ -175,12 +142,11 @@ export default function Player({
             </>
           ) : (
             <VideoView
-              ref={videoRef}
               player={player}
               style={StyleSheet.absoluteFill}
               nativeControls
               fullscreenOptions={{ enable: true }}
-              contentFit={fit}
+              contentFit="contain"
             />
           )}
           {!demo && (status === "loading" || status === "idle") && (
@@ -241,198 +207,6 @@ export default function Player({
               </Text>
             </Pressable>
           </View>
-          <View style={s.console}>
-            {live ? (
-              <View style={s.liveBar}>
-                <View style={s.liveDot} />
-                <Text style={s.liveText}>
-                  {demo ? "LIVE CHANNEL PREVIEW" : "LIVE BROADCAST"}
-                </Text>
-                <Text style={s.liveHint}>No seeking</Text>
-              </View>
-            ) : (
-              <>
-                <Pressable
-                  accessibilityRole="adjustable"
-                  accessibilityLabel="Playback position"
-                  accessibilityValue={{
-                    min: 0,
-                    max: Math.max(0, Math.floor(duration)),
-                    now: Math.min(
-                      Math.floor(duration),
-                      Math.max(0, Math.floor(currentTime)),
-                    ),
-                  }}
-                  accessibilityActions={[
-                    { name: "increment", label: "Forward ten seconds" },
-                    { name: "decrement", label: "Back ten seconds" },
-                  ]}
-                  onAccessibilityAction={(event) => {
-                    if (ready && duration > 0)
-                      control(() => {
-                        player.currentTime = Math.min(
-                          duration,
-                          Math.max(
-                            0,
-                            player.currentTime +
-                              (event.nativeEvent.actionName === "increment"
-                                ? 10
-                                : -10),
-                          ),
-                        );
-                      });
-                  }}
-                  disabled={!ready || duration <= 0}
-                  onLayout={(event) =>
-                    setSeekWidth(event.nativeEvent.layout.width)
-                  }
-                  onPress={(event) =>
-                    control(() => {
-                      player.currentTime = Math.min(
-                        duration,
-                        Math.max(
-                          0,
-                          (event.nativeEvent.locationX / seekWidth) * duration,
-                        ),
-                      );
-                    })
-                  }
-                  style={s.seekTarget}
-                >
-                  <View style={s.seekTrack}>
-                    <View
-                      style={[s.seekProgress, { width: `${progress * 100}%` }]}
-                    />
-                  </View>
-                </Pressable>
-                <View style={s.timeRow}>
-                  <Text testID="elapsed-time" style={s.time}>
-                    {formatTime(currentTime)}
-                  </Text>
-                  <Text style={s.time}>{formatTime(duration)}</Text>
-                </View>
-              </>
-            )}
-            <View style={s.transport}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={muted ? "Unmute" : "Mute"}
-                disabled={!ready}
-                onPress={() =>
-                  control(() => {
-                    player.muted = !player.muted;
-                  })
-                }
-                style={[s.smallControl, !ready && s.disabled]}
-              >
-                <Text style={s.smallControlIcon}>{muted ? "♬̸" : "♪"}</Text>
-                <Text style={s.controlLabel}>{muted ? "Unmute" : "Sound"}</Text>
-              </Pressable>
-              {!live && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Back 10 seconds"
-                  disabled={!ready || duration <= 0}
-                  onPress={() =>
-                    control(() => {
-                      player.currentTime = Math.max(0, player.currentTime - 10);
-                    })
-                  }
-                  style={[s.skip, (!ready || duration <= 0) && s.disabled]}
-                >
-                  <Text style={s.skipIcon}>↶</Text>
-                  <Text style={s.controlLabel}>10 sec</Text>
-                </Pressable>
-              )}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={
-                  isPlaying ? "Pause playback" : "Play playback"
-                }
-                disabled={!ready}
-                onPress={() =>
-                  control(() => (isPlaying ? player.pause() : player.play()))
-                }
-                style={[s.play, !ready && s.disabled]}
-              >
-                {isPlaying ? (
-                  <Text style={s.pauseIcon}>Ⅱ</Text>
-                ) : (
-                  <View style={s.playTriangle} />
-                )}
-              </Pressable>
-              {!live && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Forward 10 seconds"
-                  disabled={!ready || duration <= 0}
-                  onPress={() =>
-                    control(() => {
-                      player.currentTime = Math.min(
-                        duration,
-                        player.currentTime + 10,
-                      );
-                    })
-                  }
-                  style={[s.skip, (!ready || duration <= 0) && s.disabled]}
-                >
-                  <Text style={s.skipIcon}>↷</Text>
-                  <Text style={s.controlLabel}>10 sec</Text>
-                </Pressable>
-              )}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Enter fullscreen"
-                disabled={!ready}
-                onPress={() => {
-                  setControlError("");
-                  void videoRef.current
-                    ?.enterFullscreen()
-                    .catch(() =>
-                      setControlError(
-                        "Fullscreen is not available on this device.",
-                      ),
-                    );
-                }}
-                style={[s.smallControl, !ready && s.disabled]}
-              >
-                <Text style={s.smallControlIcon}>⛶</Text>
-                <Text style={s.controlLabel}>Full</Text>
-              </Pressable>
-            </View>
-            <View style={s.options}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Change picture fit"
-                disabled={demo}
-                onPress={() => setFit(fit === "contain" ? "cover" : "contain")}
-                style={[s.option, demo && s.disabled]}
-              >
-                <Text style={s.optionLabel}>PICTURE</Text>
-                <Text style={s.optionValue}>
-                  {fit === "contain" ? "Fit screen" : "Fill screen"} ↔
-                </Text>
-              </Pressable>
-              {!live && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Change playback speed"
-                  disabled={!ready}
-                  onPress={() =>
-                    control(() => {
-                      const rates = [1, 1.25, 1.5, 2, 0.75];
-                      player.playbackRate =
-                        rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-                    })
-                  }
-                  style={[s.option, !ready && s.disabled]}
-                >
-                  <Text style={s.optionLabel}>SPEED</Text>
-                  <Text style={s.optionValue}>{playbackRate}×</Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
           {!!controlError && (
             <Text accessibilityRole="alert" style={s.error}>
               {controlError}
@@ -442,8 +216,8 @@ export default function Player({
             <View style={s.infoCard}>
               <Text style={s.infoTitle}>A preview of your movie night</Text>
               <Text style={s.infoText}>
-                Playback controls become available when you connect your Xtream
-                playlist. You can explore the player and save demo titles here.
+                Connect your Xtream playlist to watch. Playback controls appear
+                directly on the video. You can save demo titles here.
               </Text>
             </View>
           )}
@@ -635,97 +409,6 @@ const s = StyleSheet.create({
   },
   saveActive: { backgroundColor: "#203e35", borderColor: "#477a62" },
   saveIcon: { color: "#d6e1da", fontSize: 27 },
-  console: {
-    backgroundColor: "#121e28",
-    borderWidth: 1,
-    borderColor: "#283a43",
-    borderRadius: 20,
-    padding: 18,
-  },
-  seekTarget: { minHeight: 30, justifyContent: "center" },
-  seekTrack: {
-    height: 4,
-    borderRadius: 4,
-    overflow: "hidden",
-    backgroundColor: "#34444d",
-  },
-  seekProgress: { height: 4, backgroundColor: "#83e7c4" },
-  timeRow: { flexDirection: "row", justifyContent: "space-between" },
-  time: { color: "#a3b6bc", fontSize: 10, fontVariant: ["tabular-nums"] },
-  transport: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 17,
-    marginBottom: 20,
-    gap: 2,
-  },
-  smallControl: {
-    minWidth: 38,
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-  },
-  smallControlIcon: { color: "#e0e9e1", fontSize: 24 },
-  controlLabel: { color: "#93a7b0", fontSize: 8 },
-  skip: {
-    minWidth: 38,
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  skipIcon: { fontSize: 27, color: "#d9e7e1" },
-  play: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: "#83e7c4",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playTriangle: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 10,
-    borderBottomWidth: 10,
-    borderLeftWidth: 15,
-    borderTopColor: "transparent",
-    borderBottomColor: "transparent",
-    borderLeftColor: "#142920",
-    marginLeft: 4,
-  },
-  pauseIcon: { color: "#142920", fontSize: 26, fontWeight: "900" },
-  disabled: { opacity: 0.35 },
-  options: {
-    flexDirection: "row",
-    borderTopWidth: 1,
-    borderColor: "#2b3b44",
-    paddingTop: 16,
-    gap: 12,
-  },
-  option: { flex: 1, gap: 6, minHeight: 44, justifyContent: "center" },
-  optionLabel: {
-    color: "#6e8a94",
-    fontSize: 8,
-    letterSpacing: 1.5,
-    fontWeight: "700",
-  },
-  optionValue: { color: "#cfddd8", fontSize: 11 },
-  liveBar: {
-    flexDirection: "row",
-    gap: 7,
-    alignItems: "center",
-    minHeight: 36,
-  },
-  liveDot: { width: 6, height: 6, borderRadius: 4, backgroundColor: "#83e7c4" },
-  liveText: {
-    color: "#a5e7cd",
-    fontSize: 9,
-    letterSpacing: 1,
-    fontWeight: "600",
-  },
-  liveHint: { marginLeft: "auto", color: "#8c9fa9", fontSize: 9 },
   error: { color: "#ffb0a8", fontSize: 12, lineHeight: 18, marginTop: 15 },
   infoCard: {
     marginTop: 18,

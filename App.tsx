@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import { router } from "expo-router";
+import { useMovieSession } from "./src/MovieSession";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, Platform, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -21,6 +23,7 @@ const SECRET_KEY = "currentline.connection";
 const streamKey = (stream: Stream) => `${stream.kind}:${stream.id}`;
 
 export default function App() {
+  const { setSession } = useMovieSession();
   const [form, setForm] = useState<Credentials>(EMPTY);
   const [credentials, setCredentials] = useState<Credentials | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -155,11 +158,17 @@ export default function App() {
     setError("");
     favoriteStorage.current = "";
   }
-  function toggleFavorite(stream: Stream) {
+  const favoritesRef = useRef(favorites);
+  useEffect(() => {
+    favoritesRef.current = favorites;
+  }, [favorites]);
+  const toggleFavorite = useCallback((stream: Stream) => {
     const id = streamKey(stream);
-    const next = favorites.includes(id)
-      ? favorites.filter((value) => value !== id)
-      : [...favorites, id];
+    const current = favoritesRef.current;
+    const next = current.includes(id)
+      ? current.filter((value) => value !== id)
+      : [...current, id];
+    favoritesRef.current = next;
     setFavorites(next);
     const key = favoriteStorage.current;
     if (key)
@@ -168,8 +177,19 @@ export default function App() {
         .catch(() => {
           setError("Could not save favorites on this device.");
         });
-  }
+  }, []);
+  useEffect(() => {
+    setSession(
+      catalog
+        ? { catalog, credentials, demo, favorites, onFavorite: toggleFavorite }
+        : null,
+    );
+  }, [catalog, credentials, demo, favorites, toggleFavorite, setSession]);
   function play(stream: Stream) {
+    if (stream.kind === "movie") {
+      router.push({ pathname: "/movie", params: { id: stream.id } });
+      return;
+    }
     setPlaying(stream);
   }
 
